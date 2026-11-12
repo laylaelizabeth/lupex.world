@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOCUSLOOP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&family=Silkscreen:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#000000;
+    --panel:#000000;
+    --paper:#e9e6da;
+    --paper-ink:#121210;
+    --paper-line: rgba(0,0,0,0.18);
+    --ink:#f3f3ee;
+    --dim:#8f8f88;
+    --faint:#4c4c46;
+    --line: rgba(255,255,255,0.22);
+    --line-soft: rgba(255,255,255,0.1);
+    --signal:#cfff3d;
+    --warn:#ff5b4d;
+    --accent: var(--signal);
+    --dot-speed: 60ms;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--void); color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    position:relative;
+  }
+  ::selection{ background:var(--signal); color:#000; }
+  .mono{ font-family:'IBM Plex Mono',monospace; }
+  .serif{ font-family:'VT323',monospace; letter-spacing:0.01em; }
+  .display{ font-family:'VT323',monospace; letter-spacing:0.01em; }
+  button{ font-family:'IBM Plex Mono',monospace; cursor:pointer; border:none; background:none; color:inherit; }
+  button:focus-visible,[tabindex]:focus-visible,[contenteditable]:focus-visible{ outline:1.5px dashed var(--signal); outline-offset:2px; }
+
+  /* grain overlay */
+  body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:199;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity:0.05; mix-blend-mode:overlay;
+  }
+
+  /* scanline overlay */
+  body::after{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:200;
+    background:repeating-linear-gradient(180deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode:overlay;
+  }
+
+  /* ---------------- TITLE BAR ---------------- */
+  .titlebar{
+    display:flex; align-items:center; gap:8px; padding:7px 14px;
+    border-bottom:1px solid var(--line-soft); font-family:'IBM Plex Mono',monospace; font-size:0.68rem;
+    color:var(--faint); letter-spacing:0.04em;
+  }
+  .titlebar .sq{ width:8px; height:8px; border:1px solid var(--faint); }
+  .titlebar .path{ margin-left:8px; }
+  .titlebar .meter{ display:flex; gap:2px; align-items:flex-end; height:10px; margin-left:16px; }
+  .titlebar .meter span{ width:2px; background:var(--faint); height:20%; animation:meter 1.3s ease-in-out infinite; }
+  .titlebar .meter span:nth-child(1){ animation-delay:0s; }
+  .titlebar .meter span:nth-child(2){ animation-delay:.15s; }
+  .titlebar .meter span:nth-child(3){ animation-delay:.3s; }
+  .titlebar .meter span:nth-child(4){ animation-delay:.45s; }
+  .titlebar .meter span:nth-child(5){ animation-delay:.6s; }
+  @keyframes meter{ 0%,100%{ height:15%; } 50%{ height:95%; } }
+  .titlebar .clock{ margin-left:auto; }
+
+  /* ---------------- NAV ---------------- */
+  .navbar{
+    position:sticky; top:0; z-index:60; background:#000;
+    display:flex; align-items:center; justify-content:space-between; gap:18px;
+    padding:16px 24px; border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .brand{ font-family:'Silkscreen',monospace; font-size:1rem; letter-spacing:0.02em; display:flex; align-items:center; gap:8px; }
+  .brand-mark{ image-rendering:pixelated; }
+  .brand .cursor{ display:inline-block; width:9px; height:1.1em; background:var(--signal); animation:blink 1s step-end infinite; margin-left:2px; }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  .mode-dir{ display:flex; gap:2px; flex-wrap:wrap; border:1px solid var(--line); }
+  .mode-row{
+    font-family:'IBM Plex Mono',monospace; font-size:0.7rem; letter-spacing:0.03em;
+    padding:9px 13px; color:var(--dim); display:flex; gap:7px; align-items:center;
+    border-right:1px solid var(--line-soft); transition:.15s;
+  }
+  .mode-row:last-child{ border-right:none; }
+  .mode-row:hover{ color:var(--ink); }
+  .mode-row.active{ background:var(--accent); color:#000; font-weight:600; }
+  .mode-row .n{ opacity:0.7; }
+
+  .xp{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--dim); white-space:nowrap; }
+  .xp b{ color:var(--ink); }
+
+  .mode-caption{
+    font-family:'Inter',sans-serif; font-weight:500; font-size:0.95rem; color:var(--dim); max-width:520px;
+  }
+  .mode-caption b{ font-family:'VT323',monospace; font-weight:400; font-size:1.35em; letter-spacing:0.02em; color:var(--signal); }
+  .mode-caption:before{ content:'> '; color:var(--signal); font-family:'IBM Plex Mono',monospace; }
+
+  /* ---------------- HERO ---------------- */
+  .hero{
+    display:flex; align-items:center; justify-content:space-between; gap:32px; flex-wrap:wrap;
+    padding:44px 24px 40px; border-bottom:1px solid var(--line); max-width:1320px; margin:0 auto;
+  }
+  .hero-copy{ max-width:560px; }
+  .hero-h1{
+    font-family:'VT323',monospace; font-weight:400; letter-spacing:0.01em;
+    font-size:clamp(2.6rem, 6vw, 4.4rem); line-height:1; margin:0 0 16px; color:var(--ink);
+  }
+  .hero-art{ flex-shrink:0; }
+  .hero-art canvas{ image-rendering:pixelated; display:block; }
+
+  /* ---------------- LAYOUT ---------------- */
+  .board{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; padding:20px 24px 0; max-width:1320px; margin:0 auto; align-items:start; }
+  @media (max-width:920px){ .board{ grid-template-columns:1fr; } }
+
+  .card{ position:relative; border:1px solid var(--line); background:#000; padding:20px 20px 22px; }
+  .card:before, .card:after{ content:''; position:absolute; width:9px; height:9px; border:1px solid var(--faint); }
+  .card:before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+  .card:after{ bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+  .card-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:12px; flex-wrap:wrap; }
+  .card-head .titling{ display:flex; align-items:baseline; gap:9px; }
+  .card-head .idx{ font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--faint); }
+  .card-head h2{ margin:0; font-family:'VT323',monospace; font-size:1.85rem; letter-spacing:0.01em; color:var(--ink); font-weight:400; }
+  .card-head .tools{ display:flex; gap:8px; flex-wrap:wrap; }
+
+  .brkt-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.03em; color:var(--dim);
+    border:1px solid var(--line); padding:6px 10px; transition:.15s;
+  }
+  .brkt-btn:before{ content:'['; color:var(--faint); margin-right:5px; }
+  .brkt-btn:after{ content:']'; color:var(--faint); margin-left:5px; }
+  .brkt-btn:hover{ background:var(--ink); color:#000; }
+  .brkt-btn:hover:before, .brkt-btn:hover:after{ color:#000; }
+  .brkt-btn.on{ background:var(--signal); color:#000; border-color:var(--signal); }
+  .brkt-btn.on:before, .brkt-btn.on:after{ color:#000; }
+
+  .primary-btn{
+    font-family:'IBM Plex Mono',monospace; font-size:0.72rem; letter-spacing:0.03em; text-transform:uppercase;
+    background:var(--ink); color:#000; font-weight:600; padding:11px 18px; transition:.15s;
+  }
+  .primary-btn:hover{ background:var(--signal); }
+
+  .hide-in-focus{ transition: opacity .3s; }
+  body[data-mode="hyperfocus"] .hide-in-focus, body[data-mode="recharge"] .hide-in-focus{
+    opacity:0.15; pointer-events:none; filter:grayscale(1);
+  }
+
+  /* ---------------- MIND MAP ---------------- */
+  .mindmap-wrap{ grid-column:1/2; }
+  #mmCanvas{
+    position:relative; height:420px; border:1px solid var(--line-soft);
+    background:
+      linear-gradient(var(--line-soft) 1px, transparent 1px) 0 0/100% 24px,
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px) 0 0/24px 100%,
+      #000;
+    overflow:hidden;
+  }
+  #mmCanvas:before, #mmCanvas:after{ content:''; position:absolute; width:9px; height:9px; border:1px solid var(--dim); z-index:2; }
+  #mmCanvas:before{ top:6px; left:6px; border-right:none; border-bottom:none; }
+  #mmCanvas:after{ bottom:6px; right:6px; border-left:none; border-top:none; }
+  #mmLines{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .mm-node{
+    position:absolute; min-width:120px; max-width:190px; padding:9px 11px;
+    background:#000; color:var(--ink); border:1px solid var(--line);
+    font-family:'IBM Plex Mono',monospace; font-size:0.78rem;
+    cursor:grab; user-select:none; touch-action:none; transition:border-color .15s;
+  }
+  .mm-node.root{ background:var(--ink); color:#000; border-color:var(--ink); font-weight:600; }
+  .mm-node.selected{ border-color:var(--signal); box-shadow:0 0 0 1px var(--signal); }
+  .mm-node .badge{ display:block; font-size:0.6rem; color:var(--faint); margin-bottom:3px; letter-spacing:0.04em; }
+  .mm-node.root .badge{ color:rgba(0,0,0,0.45); }
+  .mm-node .txt{ outline:none; font-family:'Inter',sans-serif; font-size:0.86rem; }
+  .mm-node .del{
+    position:absolute; top:-8px; right:-8px; width:16px; height:16px; background:#000; color:var(--dim);
+    font-size:9px; line-height:16px; text-align:center; border:1px solid var(--line); opacity:0; transition:.15s;
+  }
+  .mm-node:hover .del{ opacity:1; }
+  .mm-hint{ font-size:0.68rem; color:var(--faint); margin-top:10px; font-family:'IBM Plex Mono',monospace; }
+
+  /* ---------------- NOTES (paper documents) ---------------- */
+  .notes-wrap{ grid-column:2/3; }
+  #notesWall{ display:flex; flex-wrap:wrap; gap:14px; min-height:120px; align-content:flex-start; }
+  .note{
+    width:148px; min-height:118px; padding:10px 11px; background:var(--paper); color:var(--paper-ink);
+    position:relative; font-family:'IBM Plex Mono',monospace; font-size:0.72rem; line-height:1.5;
+    box-shadow:2px 3px 0 rgba(0,0,0,0.5);
+  }
+  .note:nth-child(odd){ transform:rotate(-1.1deg); }
+  .note:nth-child(even){ transform:rotate(1deg); }
+  .note .badge{ display:flex; justify-content:space-between; font-size:0.6rem; color:rgba(0,0,0,0.4); border-bottom:1px solid var(--paper-line); padding-bottom:6px; margin-bottom:7px; letter-spacing:0.02em; }
+  .note .txt{ outline:none; word-break:break-word; font-family:'Inter',sans-serif; font-size:0.82rem; color:var(--paper-ink); }
+  .note .del{ position:absolute; bottom:8px; right:9px; color:rgba(0,0,0,0.35); font-size:10px; opacity:0; transition:.15s; }
+  .note:hover .del{ opacity:1; }
+  .empty-hint{ color:var(--faint); font-size:0.78rem; font-family:'IBM Plex Mono',monospace; }
+  .empty-hint:before{ content:'// '; }
+
+  /* ---------------- QUESTS ---------------- */
+  .quests-wrap{ grid-column:1/3; margin-top:16px; margin-bottom:120px; }
+  @media (max-width:920px){ .quests-wrap{ grid-column:1/2; } }
+  .breadcrumb{ font-size:0.7rem; color:var(--faint); margin-bottom:14px; letter-spacing:0.02em; }
+  .breadcrumb .cursor2{ display:inline-block; width:6px; height:0.95em; background:var(--faint); margin-left:3px; vertical-align:-1px; animation:blink 1s step-end infinite; }
+  .quest-body{ display:grid; grid-template-columns:1.5fr 1fr; gap:0 28px; }
+  @media (max-width:760px){ .quest-body{ grid-template-columns:1fr; } }
+
+  .add-quest{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .add-quest input[type=text]{
+    flex:1; min-width:160px; background:#000; border:1px solid var(--line); color:var(--ink);
+    padding:11px 12px; font-size:0.86rem; font-family:'Inter'; border-radius:0;
+  }
+  .add-quest select{
+    background:#000; border:1px solid var(--line); color:var(--ink); padding:11px;
+    font-size:0.72rem; font-family:'IBM Plex Mono',monospace;
+  }
+
+  .quest-item{ display:flex; align-items:flex-start; gap:12px; border-bottom:1px solid var(--line-soft); padding:13px 2px; font-family:'IBM Plex Mono',monospace; }
+  .quest-item.done{ opacity:0.32; }
+  .quest-item.done .qtext{ text-decoration:line-through; }
+  .qcheck{ width:16px; height:16px; border:1px solid var(--dim); flex-shrink:0; margin-top:3px; display:grid; place-items:center; font-size:10px; color:transparent; }
+  .quest-item.done .qcheck{ background:var(--signal); border-color:var(--signal); color:#000; }
+  .qmain{ flex:1; min-width:0; }
+  .qtext{ font-family:'Inter',sans-serif; font-weight:500; font-size:0.92rem; color:var(--ink); }
+  .qmeta{ display:flex; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .qext{ font-size:0.68rem; letter-spacing:0.03em; }
+  .qbtns{ display:flex; gap:4px; flex-shrink:0; }
+  .icon-btn{ color:var(--faint); font-size:0.64rem; padding:5px 7px; border:1px solid var(--line-soft); }
+  .icon-btn:hover{ color:#000; background:var(--ink); border-color:var(--ink); }
+
+  .steps-panel{ margin-top:10px; padding:10px 12px; background:#000; border:1px solid var(--line-soft); border-left:2px solid var(--signal); }
+  .steps-panel div{ font-family:'Inter',sans-serif; font-size:0.81rem; color:var(--ink); margin:6px 0; display:flex; gap:8px; }
+  .steps-panel div:before{ content:'>'; color:var(--signal); font-family:'IBM Plex Mono',monospace; }
+
+  .focus-card{ padding:6px 2px 20px; }
+  .focus-card .eyebrow{ font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--faint); }
+  .focus-card .eyebrow:before{ content:'// '; }
+  .focus-card .big{ font-family:'VT323',monospace; font-weight:400; letter-spacing:0.01em; font-size:2.5rem; line-height:1.1; margin:10px 0 8px; color:var(--ink); }
+  .timer{ font-family:'IBM Plex Mono',monospace; font-size:2.5rem; margin:16px 0; color:var(--ink); }
+  .timer-btns{ display:flex; gap:10px; }
+
+  /* donut */
+  .donut-wrap{ display:flex; flex-direction:column; align-items:center; gap:16px; padding-top:2px; }
+  #donut{ width:168px; height:168px; border-radius:50%; display:grid; place-items:center; }
+  #donutHole{ width:114px; height:114px; border-radius:50%; background:#000; display:grid; place-items:center; text-align:center; padding:6px; border:1px solid var(--line-soft); }
+  #donutHole .lbl{ font-family:'IBM Plex Mono',monospace; font-size:0.6rem; color:var(--faint); letter-spacing:0.04em; }
+  #donutHole .val{ font-family:'VT323',monospace; font-weight:400; letter-spacing:0.01em; font-size:1.3rem; margin-top:5px; color:var(--ink); }
+  .legend{ display:flex; flex-direction:column; gap:8px; width:100%; }
+  .legend-row{ display:flex; align-items:center; gap:9px; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; color:var(--dim); }
+  .legend-swatch{ width:8px; height:8px; flex-shrink:0; }
+
+  /* ---------------- SIGNATURE: DITHER FIELD ---------------- */
+  .focus-field-wrap{
+    position:fixed; right:24px; bottom:56px; z-index:60; width:96px; height:96px;
+    border:1px solid var(--line); background:#000; cursor:pointer;
+  }
+  #ditherField{ width:100%; height:100%; display:block; image-rendering:pixelated; }
+
+  /* status bar */
+  .statusbar{
+    position:fixed; left:0; right:0; bottom:0; z-index:70; background:#000; border-top:1px solid var(--line);
+    display:flex; gap:22px; padding:9px 24px; font-family:'IBM Plex Mono',monospace; font-size:0.66rem; color:var(--faint);
+    flex-wrap:wrap; letter-spacing:0.02em;
+  }
+  .statusbar .key{ color:var(--dim); }
+  .statusbar .key b{ color:var(--ink); border:1px solid var(--line-soft); padding:1px 5px; margin-right:5px; }
+  .statusbar .fill{ margin-left:auto; color:var(--faint); }
+
+  .particle-dot{ position:fixed; z-index:80; pointer-events:none; animation:dotfly 0.85s ease-out forwards; }
+  .particle-label{ position:fixed; z-index:80; pointer-events:none; font-family:'IBM Plex Mono',monospace; font-size:0.7rem; animation:labelfly 1s ease-out forwards; }
+  @keyframes dotfly{ to{ transform:translate(var(--dx),var(--dy)); opacity:0; } }
+  @keyframes labelfly{ to{ transform:translate(var(--dx),var(--dy)); opacity:0; } }
+
+  @media (prefers-reduced-motion: reduce){ *{ animation-duration:0.001s !important; } }
+</style>
+</head>
+<body data-mode="balanced">
+
+<div class="titlebar">
+  <div class="sq"></div><div class="sq"></div><div class="sq"></div>
+  <span class="path">~/focusloop/session.app</span>
+  <div class="meter"><span></span><span></span><span></span><span></span><span></span></div>
+  <span class="clock" id="clockTxt">00:00:00</span>
+</div>
+
+<div class="navbar">
+  <div class="brand"><canvas class="brand-mark" id="brandMark" width="16" height="16"></canvas>FOCUS//LOOP<span class="cursor"></span></div>
+  <div class="mode-dir" id="modeTabs"></div>
+  <div class="xp">XP <b id="xpVal">000</b></div>
+</div>
+
+<div class="hero">
+  <div class="hero-copy">
+    <h1 class="hero-h1" id="heroHeadline"></h1>
+    <div class="mode-caption" id="modeCaption"></div>
+  </div>
+  <div class="hero-art"><canvas id="heroDither" width="210" height="210"></canvas></div>
+</div>
+
+<div class="board">
+
+  <div class="card mindmap-wrap hide-in-focus">
+    <div class="card-head">
+      <div class="titling"><span class="idx mono">01</span><h2>Mind_map.sys</h2></div>
+      <div class="tools">
+        <button class="brkt-btn" id="addNodeBtn">NODE</button>
+        <button class="brkt-btn" id="linkModeBtn">LINK</button>
+        <button class="brkt-btn" id="clearMapBtn">CLEAR</button>
+      </div>
+    </div>
+    <div id="mmCanvas"><svg id="mmLines"></svg></div>
+    <div class="mm-hint">// drag to move — LINK then tap two nodes to connect — click text to rename</div>
+  </div>
+
+  <div class="card notes-wrap hide-in-focus">
+    <div class="card-head">
+      <div class="titling"><span class="idx mono">02</span><h2>Notes.txt</h2></div>
+      <div class="tools"><button class="brkt-btn" id="addNoteBtn">NEW</button></div>
+    </div>
+    <div id="notesWall"></div>
+  </div>
+
+  <div class="card quests-wrap">
+    <div class="card-head">
+      <div class="titling"><span class="idx mono">03</span><h2 id="questTitle">Quest_list.sys</h2></div>
+    </div>
+    <div class="breadcrumb mono" id="breadcrumb">C:\FOCUSLOOP\QUESTS&gt;<span class="cursor2"></span></div>
+    <div id="questBody" class="quest-body"></div>
+  </div>
+
+</div>
+
+<div class="focus-field-wrap" id="orb" title="focus field — click for a status ping">
+  <canvas id="ditherField" width="48" height="48"></canvas>
+</div>
+
+<div class="statusbar">
+  <span class="key"><b>1–5</b>switch mode</span>
+  <span class="key"><b>N</b>new node</span>
+  <span class="key"><b>L</b>link mode</span>
+  <span class="fill" id="statusFill">focusloop v1.0 — session active</span>
+</div>
+
+<script>
+/* ---------------- STATE ---------------- */
+const MODES = {
+  recharge:  { n:'01', label:'RECHARGE',   dotColor:'#8f8f88', speed:26, density:0.16,
+    headline:'Nothing has to<br>happen right now.',
+    caption:'<b>Recharge:</b> zero pressure. One tiny thing, already broken into steps.' },
+  warmup:    { n:'02', label:'WARM-UP',    dotColor:'#f3f3ee', speed:20, density:0.22,
+    headline:'Small moves<br>still count.',
+    caption:'<b>Warm-up:</b> a gentle top three. Small moves count.' },
+  balanced:  { n:'03', label:'BALANCED',   dotColor:'#cfff3d', speed:14, density:0.30,
+    headline:'Everything, ranked<br>and in view.',
+    caption:'<b>Balanced:</b> full board — mind map, notes, and the whole quest list ranked by weight.' },
+  quickwins: { n:'04', label:'QUICK WINS', dotColor:'#cfff3d', speed:7,  density:0.40,
+    headline:'Fast is a<br>valid strategy.',
+    caption:'<b>Quick wins:</b> only the fast, easy stuff. Stack wins, ride the momentum.' },
+  hyperfocus:{ n:'05', label:'HYPERFOCUS', dotColor:'#ff5b4d', speed:3,  density:0.52,
+    headline:'One thing.<br>Full volume.',
+    caption:'<b>Hyperfocus:</b> one mission, a timer, nothing else in view.' },
+};
+const IMPORTANCE = {
+  1:{ext:'LOW',    color:'var(--faint)'},
+  2:{ext:'MILD',   color:'var(--dim)'},
+  3:{ext:'MED',    color:'var(--ink)'},
+  4:{ext:'HIGH',   color:'var(--signal)'},
+  5:{ext:'URGENT', color:'var(--warn)'},
+};
+
+let state = {
+  mode:'balanced', xp:0, linkMode:false, pendingLink:null,
+  sprintSeconds:0, sprintTimer:null,
+  notes:[
+    {id:1, text:'Bring headphones to bio lab'},
+    {id:2, text:'Ask Mia about group proj'},
+  ],
+  tasks:[
+    {id:1, text:'Finish history essay outline', importance:5, done:false, steps:[]},
+    {id:2, text:'Email TA about extension', importance:3, done:false, steps:[]},
+    {id:3, text:'Pack gym bag', importance:1, done:false, steps:[]},
+  ],
+  mmNodes:[
+    {id:1, x:290, y:170, text:'This Semester', root:true},
+    {id:2, x:90,  y:60,  text:'Classes'},
+    {id:3, x:480, y:70,  text:'Deadlines'},
+  ],
+  mmEdges:[ {from:1,to:2}, {from:1,to:3} ],
+};
+let idSeq = 100;
+
+/* ---------------- TITLEBAR CLOCK ---------------- */
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clockTxt').textContent = d.toTimeString().slice(0,8);
+}
+tickClock(); setInterval(tickClock, 1000);
+
+/* ---------------- NAV / MODES ---------------- */
+const modeTabs = document.getElementById('modeTabs');
+Object.entries(MODES).forEach(([key,m])=>{
+  const b = document.createElement('button');
+  b.className='mode-row'+(key===state.mode?' active':'');
+  b.dataset.mode=key;
+  b.innerHTML = `<span class="n">${m.n}</span> ${m.label}`;
+  b.onclick=()=>setMode(key);
+  modeTabs.appendChild(b);
+});
+
+function setMode(key){
+  state.mode = key;
+  document.body.dataset.mode = key;
+  document.getElementById('modeCaption').innerHTML = MODES[key].caption;
+  document.getElementById('heroHeadline').innerHTML = MODES[key].headline;
+  [...modeTabs.children].forEach(el=> el.classList.toggle('active', el.dataset.mode===key));
+  document.getElementById('statusFill').textContent = `mode: ${MODES[key].label.toLowerCase()} — session active`;
+  const bc = document.getElementById('breadcrumb');
+  if(bc) bc.innerHTML = `C:\\FOCUSLOOP\\QUESTS\\${MODES[key].label.replace(' ','_')}&gt;<span class="cursor2"></span>`;
+  stopSprint();
+  renderQuests();
+}
+
+document.addEventListener('keydown', (e)=>{
+  const tag = (e.target.tagName||'').toLowerCase();
+  if(tag==='input' || tag==='select' || e.target.isContentEditable) return;
+  const modeKeys = Object.keys(MODES);
+  if(e.key>='1' && e.key<='5'){ setMode(modeKeys[parseInt(e.key)-1]); }
+  if(e.key==='n' || e.key==='N'){ document.getElementById('addNodeBtn').click(); }
+  if(e.key==='l' || e.key==='L'){ document.getElementById('linkModeBtn').click(); }
+});
+
+/* ---------------- SIGNATURE: DITHER FIELD (Bayer ordered-dither halftone, reusable) ---------------- */
+const BAYER4 = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]].map(row=>row.map(v=>(v+0.5)/16));
+
+function makeDitherRenderer(canvas, grid, opts){
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+  const cell = size/grid;
+  let phase = (opts&&opts.phaseSeed) || 0;
+  function draw(){
+    const cfg = MODES[state.mode];
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,size,size);
+    for(let y=0;y<grid;y++){
+      for(let x=0;x<grid;x++){
+        const cx = x - grid/2 + 0.5, cy = y - grid/2 + 0.5;
+        const dist = Math.sqrt(cx*cx+cy*cy) / (grid/2);
+        const wobble = Math.sin(phase*0.05 + x*0.4)*0.07 + Math.cos(phase*0.04 + y*0.4)*0.07;
+        const radial = 1 - Math.min(1, dist + wobble);
+        const value = Math.max(0, radial) * (0.6 + cfg.density);
+        const thresh = BAYER4[y%4][x%4];
+        if(value > thresh){
+          ctx.fillStyle = cfg.dotColor;
+          ctx.fillRect(x*cell, y*cell, cell-0.5, cell-0.5);
+        }
+      }
+    }
+    phase += (30 - cfg.speed) / 6 + 0.6;
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+makeDitherRenderer(document.getElementById('ditherField'), 24);
+makeDitherRenderer(document.getElementById('heroDither'), 44, {phaseSeed:12});
+makeDitherRenderer(document.getElementById('brandMark'), 8, {phaseSeed:5});
+
+document.getElementById('orb').onclick=(e)=>{
+  const vibes = ['status: you showed up. that counts.','ping: one tiny step beats zero steps.','log: momentum is a feeling, not a fact — start anyway.','note: pick the smallest possible version of the task.'];
+  spawnLabel(e.clientX, e.clientY-70, vibes[Math.floor(Math.random()*vibes.length)]);
+};
+
+function spawnLabel(x,y,text){
+  const el = document.createElement('div');
+  el.className='particle-label'; el.textContent=text; el.style.color='var(--ink)';
+  el.style.left=x+'px'; el.style.top=y+'px';
+  el.style.setProperty('--dx','0px'); el.style.setProperty('--dy','-26px');
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1000);
+}
+function spawnDots(x,y,color){
+  for(let i=0;i<12;i++){
+    const d = document.createElement('div');
+    d.className='particle-dot';
+    const s = 3;
+    d.style.width=s+'px'; d.style.height=s+'px'; d.style.background=color;
+    d.style.left=x+'px'; d.style.top=y+'px';
+    const dx=(Math.random()*130-65)+'px', dy=(-40-Math.random()*80)+'px';
+    d.style.setProperty('--dx',dx); d.style.setProperty('--dy',dy);
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),850);
+  }
+}
+function addXP(amount,x,y,color){
+  state.xp += amount;
+  document.getElementById('xpVal').textContent = String(state.xp).padStart(3,'0');
+  spawnDots(x,y,color||'var(--signal)');
+  spawnLabel(x,y-10,`+${amount} XP`);
+}
+
+/* ---------------- NOTES ---------------- */
+function renderNotes(){
+  const wall = document.getElementById('notesWall');
+  wall.innerHTML='';
+  if(state.notes.length===0){
+    wall.innerHTML = '<div class="empty-hint">NO NOTES YET — jot down whatever\'s rattling around.</div>';
+    return;
+  }
+  state.notes.forEach((n,i)=>{
+    const el = document.createElement('div');
+    el.className='note';
+    el.innerHTML = `<div class="badge"><span>N.${String(i+1).padStart(2,'0')}</span><span>TXT</span></div><div class="txt" contenteditable="true" spellcheck="false"></div><div class="del">DEL</div>`;
+    el.querySelector('.txt').textContent = n.text;
+    el.querySelector('.txt').addEventListener('blur', e=> n.text = e.target.textContent);
+    el.querySelector('.del').onclick = ()=>{ state.notes = state.notes.filter(x=>x.id!==n.id); renderNotes(); };
+    wall.appendChild(el);
+  });
+}
+document.getElementById('addNoteBtn').onclick=()=>{
+  state.notes.push({id:++idSeq, text:'New note…'});
+  renderNotes();
+};
+
+/* ---------------- MIND MAP ---------------- */
+const mmCanvas = document.getElementById('mmCanvas');
+const mmLines = document.getElementById('mmLines');
+
+function renderMindmap(){
+  mmCanvas.querySelectorAll('.mm-node').forEach(n=>n.remove());
+  state.mmNodes.forEach((node)=>{
+    const el = document.createElement('div');
+    el.className = 'mm-node'+(node.root?' root':'')+(state.pendingLink===node.id?' selected':'');
+    el.style.left = node.x+'px'; el.style.top = node.y+'px';
+    el.innerHTML = `<span class="badge">${node.root?'ROOT':'N'+String(node.id).slice(-2)}</span><div class="txt" contenteditable="true" spellcheck="false"></div><div class="del">✕</div>`;
+    el.querySelector('.txt').textContent = node.text;
+    el.dataset.id = node.id;
+    mmCanvas.appendChild(el);
+
+    el.querySelector('.txt').addEventListener('blur', e=> node.text = e.target.textContent || 'Untitled');
+    el.querySelector('.del').onclick=(e)=>{
+      e.stopPropagation();
+      state.mmNodes = state.mmNodes.filter(x=>x.id!==node.id);
+      state.mmEdges = state.mmEdges.filter(ed=>ed.from!==node.id && ed.to!==node.id);
+      renderMindmap();
+    };
+    makeDraggable(el, node);
+  });
+  drawLines();
+}
+
+function makeDraggable(el, node){
+  let dragging=false, startX,startY,origX,origY,moved=false;
+  el.addEventListener('pointerdown', e=>{
+    if(e.target.isContentEditable) return;
+    dragging=true; moved=false;
+    startX=e.clientX; startY=e.clientY; origX=node.x; origY=node.y;
+    el.setPointerCapture(e.pointerId);
+    el.style.cursor='grabbing';
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
+    node.x = Math.max(0, Math.min(mmCanvas.clientWidth-120, origX+dx));
+    node.y = Math.max(0, Math.min(mmCanvas.clientHeight-50, origY+dy));
+    el.style.left=node.x+'px'; el.style.top=node.y+'px';
+    drawLines();
+  });
+  el.addEventListener('pointerup', e=>{
+    dragging=false; el.style.cursor='grab';
+    if(!moved) handleNodeClick(node.id);
+  });
+}
+
+function handleNodeClick(id){
+  if(!state.linkMode) return;
+  if(state.pendingLink===null){ state.pendingLink = id; }
+  else if(state.pendingLink!==id){ state.mmEdges.push({from:state.pendingLink, to:id}); state.pendingLink=null; }
+  else { state.pendingLink=null; }
+  renderMindmap();
+}
+
+function drawLines(){
+  mmLines.innerHTML='';
+  state.mmEdges.forEach(edge=>{
+    const a = state.mmNodes.find(n=>n.id===edge.from);
+    const b = state.mmNodes.find(n=>n.id===edge.to);
+    if(!a||!b) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', a.x+55); line.setAttribute('y1', a.y+20);
+    line.setAttribute('x2', b.x+55); line.setAttribute('y2', b.y+20);
+    line.setAttribute('stroke', 'rgba(255,255,255,0.35)');
+    line.setAttribute('stroke-width','1');
+    line.setAttribute('stroke-dasharray','3,3');
+    mmLines.appendChild(line);
+
+    [[a.x+55,a.y+20],[b.x+55,b.y+20]].forEach(([px,py])=>{
+      const sq = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      sq.setAttribute('x',px-2); sq.setAttribute('y',py-2); sq.setAttribute('width',4); sq.setAttribute('height',4);
+      sq.setAttribute('fill','rgba(255,255,255,0.5)');
+      mmLines.appendChild(sq);
+    });
+  });
+}
+
+document.getElementById('addNodeBtn').onclick=()=>{
+  state.mmNodes.push({id:++idSeq, x:60+Math.random()*300, y:60+Math.random()*260, text:'New idea'});
+  renderMindmap();
+};
+document.getElementById('linkModeBtn').onclick=(e)=>{
+  state.linkMode = !state.linkMode; state.pendingLink=null;
+  e.target.classList.toggle('on', state.linkMode);
+  renderMindmap();
+};
+document.getElementById('clearMapBtn').onclick=()=>{
+  state.mmNodes=[{id:++idSeq,x:250,y:180,text:'This Semester',root:true}];
+  state.mmEdges=[];
+  renderMindmap();
+};
+
+/* ---------------- QUESTS / TASKS ---------------- */
+const questBody = document.getElementById('questBody');
+const questTitle = document.getElementById('questTitle');
+
+const localTemplates = [
+  t => [`Open whatever you need for "${t}" — that's it, just open it.`, `Set a 2-minute timer and touch "${t}" until it rings.`, `Do one small piece of "${t}", then decide: stop or keep going.`],
+  t => [`Write one sentence / do one click toward "${t}".`, `Gather the one thing you need for "${t}".`, `Do the most boring 2 minutes of "${t}" first.`],
+  t => [`Do "${t}" badly on purpose for 2 minutes.`, `Move your body toward the task for "${t}" (sit down, open the tab).`, `Do a tiny visible piece of "${t}" you can check off.`],
+];
+function localBreakdown(text){ return localTemplates[Math.floor(Math.random()*localTemplates.length)](text); }
+async function aiBreakdown(text){
+  try{
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6', max_tokens:300,
+        messages:[{role:'user', content:
+          `Break the task "${text}" into exactly 3 tiny, extremely low-friction micro-steps for a student with ADHD who has very low motivation right now. Each step should take under 2 minutes and feel almost too easy to refuse. Respond ONLY with a raw JSON array of exactly 3 short strings — no markdown, no preamble.`}]
+      })
+    });
+    const data = await resp.json();
+    const text2 = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const clean = text2.replace(/```json|```/g,'').trim();
+    const arr = JSON.parse(clean);
+    if(Array.isArray(arr) && arr.length>=1) return arr.slice(0,3);
+    throw new Error('bad shape');
+  }catch(err){ return localBreakdown(text); }
+}
+
+function questRow(task){
+  const row = document.createElement('div');
+  row.className = 'quest-item'+(task.done?' done':'');
+  const imp = IMPORTANCE[task.importance];
+  row.innerHTML = `
+    <button class="qcheck">✓</button>
+    <div class="qmain">
+      <div class="qtext"></div>
+      <div class="qmeta"><span class="qext" style="color:${imp.color}">.${imp.ext}</span></div>
+      <div class="steps-panel" style="display:none;"></div>
+    </div>
+    <div class="qbtns">
+      <button class="icon-btn shrink" title="Break into tiny steps">SHRINK</button>
+      <button class="icon-btn del" title="Delete">DEL</button>
+    </div>`;
+  row.querySelector('.qtext').textContent = task.text;
+
+  row.querySelector('.qcheck').onclick = (e)=>{
+    task.done = !task.done;
+    if(task.done){
+      const r = e.target.getBoundingClientRect();
+      addXP(task.importance*10, r.left, r.top, imp.color==='var(--warn)' ? '#ff5b4d' : '#cfff3d');
+    }
+    renderQuests();
+  };
+  row.querySelector('.del').onclick = ()=>{ state.tasks = state.tasks.filter(t=>t.id!==task.id); renderQuests(); };
+
+  const stepsPanel = row.querySelector('.steps-panel');
+  const shrinkBtn = row.querySelector('.shrink');
+  shrinkBtn.onclick = async ()=>{
+    if(stepsPanel.style.display==='block'){ stepsPanel.style.display='none'; return; }
+    if(task.steps.length===0){
+      shrinkBtn.textContent='...';
+      task.steps = await aiBreakdown(task.text);
+      shrinkBtn.textContent='SHRINK';
+    }
+    stepsPanel.innerHTML = task.steps.map(s=>`<div>${s}</div>`).join('');
+    stepsPanel.style.display='block';
+  };
+  return row;
+}
+
+async function autoShrink(task, container){
+  if(task.steps.length===0) task.steps = await aiBreakdown(task.text);
+  container.innerHTML = task.steps.map(s=>`<div>${s}</div>`).join('');
+}
+
+function renderQuests(){
+  questBody.innerHTML='';
+  const mode = state.mode;
+  const undone = state.tasks.filter(t=>!t.done).sort((a,b)=>b.importance-a.importance);
+  const left = document.createElement('div');
+
+  if(mode==='recharge' || mode==='hyperfocus'){
+    questTitle.textContent = mode==='recharge' ? 'One_tiny_thing.sys' : 'Mission.sys';
+    const top = undone[0];
+    const focus = document.createElement('div');
+    focus.className='focus-card';
+    if(!top){
+      focus.innerHTML = `<div class="eyebrow">EMPTY</div><div class="big">Nothing on the list.</div><p style="color:var(--dim); font-family:'IBM Plex Mono',monospace; font-size:0.8rem;">Add a quest below when you're ready.</p>`;
+    } else if(mode==='recharge'){
+      focus.innerHTML = `<div class="eyebrow">JUST THIS ONE THING</div>
+        <div class="big">${top.text}</div>
+        <div class="steps-panel" id='rechargeSteps' style="display:block; margin-top:14px;"><div>Loading tiny steps…</div></div>
+        <div style="margin-top:18px;"><button class="primary-btn" id="rechargeDone">DID A TINY BIT</button></div>`;
+      autoShrink(top, focus.querySelector('#rechargeSteps'));
+      focus.querySelector('#rechargeDone').onclick=(e)=>{
+        top.done=true;
+        const r = e.target.getBoundingClientRect();
+        addXP(top.importance*10, r.left, r.top, '#8f8f88');
+        renderQuests();
+      };
+    } else {
+      focus.innerHTML = `<div class="eyebrow">EVERYTHING ELSE IS OUT OF VIEW</div>
+        <div class="big">${top.text}</div>
+        <div class="timer" id="sprintClock">25:00</div>
+        <div class="timer-btns">
+          <button class="primary-btn" id="sprintStart">START SPRINT</button>
+          <button class="brkt-btn" id="sprintStop">STOP</button>
+        </div>
+        <div style="margin-top:18px;"><button class="brkt-btn" id="sprintDone">MARK COMPLETE</button></div>`;
+      focus.querySelector('#sprintStart').onclick = startSprint;
+      focus.querySelector('#sprintStop').onclick = stopSprint;
+      focus.querySelector('#sprintDone').onclick=(e)=>{
+        top.done=true; stopSprint();
+        const r = e.target.getBoundingClientRect();
+        addXP(top.importance*10, r.left, r.top, '#ff5b4d');
+        renderQuests();
+      };
+    }
+    left.appendChild(focus);
+  } else {
+    let listSource;
+    if(mode==='warmup'){ questTitle.textContent='Top_three.sys'; listSource = undone.slice(0,3); }
+    else if(mode==='quickwins'){ questTitle.textContent='Quick_wins.sys'; listSource = undone.filter(t=>t.importance<=2); }
+    else { questTitle.textContent='Quest_list.sys'; listSource = state.tasks.slice().sort((a,b)=> (a.done-b.done) || b.importance-a.importance); }
+
+    const addRow = document.createElement('div');
+    addRow.className='add-quest';
+    addRow.innerHTML = `
+      <input type="text" id="newTaskText" placeholder="add a quest…">
+      <select id="newTaskImp">
+        <option value="1">LOW</option><option value="2">MILD</option>
+        <option value="3" selected>MED</option><option value="4">HIGH</option><option value="5">URGENT</option>
+      </select>
+      <button class="primary-btn" id="newTaskAdd">ADD</button>`;
+    left.appendChild(addRow);
+
+    if(listSource.length===0){
+      const p = document.createElement('div');
+      p.className='empty-hint';
+      p.textContent = mode==='quickwins' ? 'NO QUICK WINS QUEUED — add a tiny, easy task.' : 'NOTHING HERE YET — add your first quest above.';
+      left.appendChild(p);
+    } else {
+      listSource.forEach(t=> left.appendChild(questRow(t)));
+    }
+  }
+
+  const right = document.createElement('div');
+  if(mode==='recharge' || mode==='hyperfocus'){
+    right.innerHTML = `<div class="empty-hint" style="text-align:center; padding-top:60px;">CHART RESTING — switch to Balanced to see the full board.</div>`;
+  } else {
+    right.appendChild(buildDonut());
+  }
+
+  questBody.appendChild(left);
+  questBody.appendChild(right);
+
+  const addBtn = document.getElementById('newTaskAdd');
+  if(addBtn){
+    addBtn.onclick = ()=>{
+      const input = document.getElementById('newTaskText');
+      const sel = document.getElementById('newTaskImp');
+      if(!input.value.trim()) return;
+      state.tasks.push({id:++idSeq, text:input.value.trim(), importance:parseInt(sel.value), done:false, steps:[]});
+      input.value='';
+      renderQuests();
+    };
+  }
+}
+
+function buildDonut(){
+  const wrap = document.createElement('div');
+  wrap.className='donut-wrap';
+  const undone = state.tasks.filter(t=>!t.done);
+  const total = undone.reduce((s,t)=>s+t.importance,0);
+
+  const donut = document.createElement('div');
+  donut.id='donut';
+  const hole = document.createElement('div');
+  hole.id='donutHole';
+
+  const resolved = {1:'#4c4c46',2:'#8f8f88',3:'#f3f3ee',4:'#cfff3d',5:'#ff5b4d'};
+
+  if(total===0){
+    donut.style.background = 'repeating-conic-gradient(rgba(255,255,255,0.08) 0 18deg, rgba(255,255,255,0.02) 18deg 36deg)';
+    hole.innerHTML = `<div class="lbl">NO ACTIVE</div><div class="val">quests</div>`;
+  } else {
+    const sorted = undone.slice().sort((a,b)=>b.importance-a.importance);
+    let acc=0;
+    const stops = sorted.map(t=>{
+      const s = acc/total*360; acc+=t.importance; const e = acc/total*360;
+      return `${resolved[t.importance]} ${s}deg ${e}deg`;
+    });
+    donut.style.background = `conic-gradient(${stops.join(',')})`;
+    const top = sorted[0];
+    hole.innerHTML = `<div class="lbl">TOP PRIORITY</div><div class="val">${top.text.length>16? top.text.slice(0,14)+'…':top.text}</div>`;
+  }
+  donut.appendChild(hole);
+  wrap.appendChild(donut);
+
+  const legend = document.createElement('div');
+  legend.className='legend';
+  if(total>0){
+    const byImp = {};
+    undone.forEach(t=> byImp[t.importance] = (byImp[t.importance]||0)+1);
+    Object.keys(byImp).sort((a,b)=>b-a).forEach(imp=>{
+      const row = document.createElement('div');
+      row.className='legend-row';
+      row.innerHTML = `<span class="legend-swatch" style="background:${resolved[imp]}"></span> .${IMPORTANCE[imp].ext} — ${byImp[imp]} quest${byImp[imp]>1?'s':''}`;
+      legend.appendChild(row);
+    });
+  } else {
+    legend.innerHTML = '<div class="legend-row">Add a quest to see it ranked here.</div>';
+  }
+  wrap.appendChild(legend);
+  return wrap;
+}
+
+/* ---------------- SPRINT TIMER ---------------- */
+function startSprint(){
+  stopSprint();
+  if(state.sprintSeconds===0) state.sprintSeconds = 25*60;
+  state.sprintTimer = setInterval(()=>{
+    state.sprintSeconds--;
+    const clock = document.getElementById('sprintClock');
+    if(clock){
+      const m = Math.floor(state.sprintSeconds/60), s = state.sprintSeconds%60;
+      clock.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    if(state.sprintSeconds<=0) stopSprint();
+  },1000);
+}
+function stopSprint(){
+  if(state.sprintTimer) clearInterval(state.sprintTimer);
+  state.sprintTimer=null; state.sprintSeconds=0;
+}
+
+/* ---------------- INIT ---------------- */
+setMode('balanced');
+renderNotes();
+renderMindmap();
+renderQuests();
+</script>
+</body>
+</html>
