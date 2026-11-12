@@ -357,9 +357,9 @@ const MODES = {
   balanced:  { n:'03', label:'BALANCED',   dotColor:'#cfff3d', speed:14, density:0.30,
     headline:'Everything, ranked<br>and in view.',
     caption:'<b>Balanced:</b> board mind map, notes, quest list ranked by weight.' },
-  quickwins: { n:'04', label:'QUICK WINS', dotColor:'#cfff3d', speed:7,  density:0.40,
+  quickwins: { n:'04', label:'QUICK DOPAMINE', dotColor:'#cfff3d', speed:7,  density:0.40,
     headline:'Fast is a<br>valid strategy.',
-    caption:'<b>Quick wins:</b> only the fast, easy stuff. Stack wins, ride the momentum.' },
+    caption:'<b>Quick dopamine:</b> only the fast, easy stuff. Stack wins, ride the momentum.' },
   hyperfocus:{ n:'05', label:'HYPERFOCUS', dotColor:'#ff5b4d', speed:3,  density:0.52,
     headline:'One thing.<br>Full volume.',
     caption:'<b>Hyperfocus:</b> one mission, a timer, nothing else in view.' },
@@ -744,7 +744,7 @@ function renderQuests(){
   } else {
     let listSource;
     if(mode==='warmup'){ questTitle.textContent='Top_three.sys'; listSource = undone.slice(0,3); }
-    else if(mode==='quickwins'){ questTitle.textContent='Quick_wins.sys'; listSource = undone.filter(t=>t.importance<=2); }
+    else if(mode==='quickwins'){ questTitle.textContent='Quick_dopamine.sys'; listSource = undone.filter(t=>t.importance<=2); }
     else { questTitle.textContent='Quest_list.sys'; listSource = state.tasks.slice().sort((a,b)=> (a.done-b.done) || b.importance-a.importance); }
 
     const addRow = document.createElement('div');
@@ -761,7 +761,7 @@ function renderQuests(){
     if(listSource.length===0){
       const p = document.createElement('div');
       p.className='empty-hint';
-      p.textContent = mode==='quickwins' ? 'NO QUICK WINS QUEUED — add a tiny, easy task.' : 'NOTHING HERE YET — add your first quest above.';
+      p.textContent = mode==='quickwins' ? 'NO QUICK DOPAMINE QUEUED — add a tiny, easy task.' : 'NOTHING HERE YET — add your first quest above.';
       left.appendChild(p);
     } else {
       listSource.forEach(t=> left.appendChild(questRow(t)));
