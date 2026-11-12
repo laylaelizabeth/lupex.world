@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TEX</title>
+<title>Lupex</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;600;700&family=Silkscreen:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -282,13 +282,13 @@
 
 <div class="titlebar">
   <div class="sq"></div><div class="sq"></div><div class="sq"></div>
-  <span class="path">~/tex/session.app</span>
+  <span class="path">~/lupex/session.app</span>
   <div class="meter"><span></span><span></span><span></span><span></span><span></span></div>
   <span class="clock" id="clockTxt">00:00:00</span>
 </div>
 
 <div class="navbar">
-  <div class="brand"><canvas class="brand-mark" id="brandMark" width="16" height="16"></canvas>TEX<span class="cursor"></span></div>
+  <div class="brand"><canvas class="brand-mark" id="brandMark" width="16" height="16"></canvas>Lupex<span class="cursor"></span></div>
   <div class="mode-dir" id="modeTabs"></div>
   <div class="xp">XP <b id="xpVal">000</b></div>
 </div>
@@ -328,7 +328,7 @@
     <div class="card-head">
       <div class="titling"><span class="idx mono">03</span><h2 id="questTitle">Quest_list.sys</h2></div>
     </div>
-    <div class="breadcrumb mono" id="breadcrumb">C:\TEX\QUESTS&gt;<span class="cursor2"></span></div>
+    <div class="breadcrumb mono" id="breadcrumb">C:\Lupex\QUESTS&gt;<span class="cursor2"></span></div>
     <div id="questBody" class="quest-body"></div>
   </div>
 
@@ -342,7 +342,7 @@
   <span class="key"><b>1–5</b>switch mode</span>
   <span class="key"><b>N</b>new node</span>
   <span class="key"><b>L</b>link mode</span>
-  <span class="fill" id="statusFill">tex v1.0 — session active</span>
+  <span class="fill" id="statusFill">Lupex v1.0 — session active</span>
 </div>
 
 <script>
@@ -419,7 +419,7 @@ function setMode(key){
   [...modeTabs.children].forEach(el=> el.classList.toggle('active', el.dataset.mode===key));
   document.getElementById('statusFill').textContent = `mode: ${MODES[key].label.toLowerCase()} — session active`;
   const bc = document.getElementById('breadcrumb');
-  if(bc) bc.innerHTML = `C:\\TEX\\QUESTS\\${MODES[key].label.replace(' ','_')}&gt;<span class="cursor2"></span>`;
+  if(bc) bc.innerHTML = `C:\\Lupex\\QUESTS\\${MODES[key].label.replace(' ','_')}&gt;<span class="cursor2"></span>`;
   stopSprint();
   renderQuests();
 }
