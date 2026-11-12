@@ -78,6 +78,8 @@
     flex-wrap:wrap;
   }
   .brand{ font-family:'Silkscreen',monospace; font-size:1rem; letter-spacing:0.02em; display:flex; align-items:center; gap:8px; }
+  .brand-wrap{ display:flex; flex-direction:column; gap:2px; }
+  .byline{ font-family:'IBM Plex Mono',monospace; font-size:0.6rem; opacity:0.6; letter-spacing:0.03em; }
   .brand-mark{ image-rendering:pixelated; }
   .brand .cursor{ display:inline-block; width:9px; height:1.1em; background:var(--signal); animation:blink 1s step-end infinite; margin-left:2px; }
   @keyframes blink{ 50%{ opacity:0; } }
@@ -288,7 +290,10 @@
 </div>
 
 <div class="navbar">
-  <div class="brand"><canvas class="brand-mark" id="brandMark" width="16" height="16"></canvas>Lupex<span class="cursor"></span></div>
+  <div class="brand-wrap">
+    <div class="brand"><canvas class="brand-mark" id="brandMark" width="16" height="16"></canvas>Lupex<span class="cursor"></span></div>
+    <div class="byline">Layla B</div>
+  </div>
   <div class="mode-dir" id="modeTabs"></div>
   <div class="xp">XP <b id="xpVal">000</b></div>
 </div>
